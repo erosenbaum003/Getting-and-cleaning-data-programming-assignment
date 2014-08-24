@@ -1,0 +1,68 @@
+# 1. Merges the training and the test sets to create one data set
+trainx <- read.table("./UCIdata/train/X_train.txt")
+trainy <- read.table("./UCIdata/train/y_train.txt")
+table(trainy)
+trainSubj <- read.table("./UCIdata/train/subject_train.txt")
+testx <- read.table("./UCIdata/test/X_test.txt")
+dim(testx) 
+testy <- read.table("./UCIdata/test/y_test.txt") 
+table(testy) 
+testSubj <- read.table("./UCIdata/test/subject_test.txt")
+joinx <- rbind(trainx, testx)
+dim(joinx) 
+joiny <- rbind(trainy, testy)
+
+dim(joiny) 
+joinSubj <- rbind(trainSubj, testSubj)
+dim(joinSubj)
+
+# 2. Extracts only the measurements on the mean and standard deviation for each measurement.  
+readfeatures <- read.table("./UCIdata/features.txt")
+dim(readfeatures) 
+meanStdIndices <- grep("mean\\(\\)|std\\(\\)", features[, 2])
+length(meanStdIndices)
+joinx <- joinx[, meanStdIndices]
+dim(joinx)
+names(joinx) <- gsub("\\(\\)", "", readfeatures[meanStdIndices, 2]) # remove "()"
+names(joinx) <- gsub("mean", "Mean", names(joinx)) # Cap M
+names(joinx) <- gsub("std", "Std", names(joinx)) # Cap S
+names(joinx) <- gsub("-", "", names(joinx)) # remove "-" from colnames 
+
+# 3. Uses descriptive activity names to name the activities in the data set
+activity <- read.table("./UCIdata/activity_labels.txt")
+activity[, 2] <- tolower(gsub("_", "", activity[, 2]))
+substr(activity[2, 2], 8, 8) <- toupper(substr(activity[2, 2], 8, 8))
+substr(activity[3, 2], 8, 8) <- toupper(substr(activity[3, 2], 8, 8))
+activityLabel <- activity[joiny[, 1], 2]
+joiny[, 1] <- activityLabel
+names(joiny) <- "activity"
+
+# 4. Appropriately labels the data set with descriptive activity names. 
+names(joinSubj) <- "subject"
+cleandata <- cbind(joinSubj, joiny, joinx)
+dim(cleandata) 
+write.table(cleandata, "merged_data.txt") # write table 1st dataset
+
+# 5. Creates a second, independent tidy data set with the average of each variable for each activity and each subject. 
+subjectLen <- length(table(joinSubj)) 
+activityLen <- dim(activity)[1] 
+columnLen <- dim(cleandata)[2]
+output <- matrix(NA, nrow=subjectLen*activityLen, ncol=columnLen) 
+output <- as.data.frame(output)
+colnames(output) <- colnames(cleandata)
+
+row <- 1
+for(i in 1:subjectLen) {
+  for(j in 1:activityLen) {
+    output[row, 1] <- sort(unique(joinSubj)[, 1])[i]
+    output[row, 2] <- activity[j, 2]
+    bool1 <- i == cleandata$subject
+    bool2 <- activity[j, 2] == cleandata$activity
+    output[row, 3:columnLen] <- colMeans(cleandata[bool1&bool2, 3:columnLen])
+    row <- row + 1
+  }
+}
+head(output)
+write.table(output, "data_with_avgs.txt") # write out the 2nd dataset
+
+
